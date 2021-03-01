@@ -7,7 +7,7 @@ official repo: https://github.com/deepmind/deepmind-research/tree/master/nfnets
     * modified depth pattern: [1, 2, 6, 3]*(1~8)
     * train / test resolution: 递增
     * drop rate: 递增
-
+    
     标准版: F0, F1, ..., F7
     加宽版: F0+, F1+, ..., F7+
 
@@ -50,8 +50,13 @@ official repo: https://github.com/deepmind/deepmind-research/tree/master/nfnets
     P(X<=x)是对应高斯正态分布的积分
     基于标准正态分布的gelu函数可以通过erf函数/sigmoid函数近似计算
 
+    keras的自定义激活函数：不能合并到conv layer里面，因为conv基类的get_config()方法从keras.activations里面读取相应的激活函数，
+    其中带参数的激活函数如PReLU（Advanced activations）、以及自定义的激活函数都不在这个字典中
+
 
 ## custom SGD_AGC optimizer
+
+
 
 
 

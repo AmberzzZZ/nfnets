@@ -1,19 +1,23 @@
-from keras.layers import Lambda, Input, AveragePooling2D, GlobalAveragePooling2D, multiply, Dropout, Dense, add
+from keras.layers import Lambda, Input, AveragePooling2D, GlobalAveragePooling2D, multiply, Dropout, Dense, add, Activation
 from keras.initializers import RandomNormal
 from keras.models import Model
+import tensorflow as tf
 from WSConv2D import WSConv2D
-from utils import nfnet_params, nonlinearities
+from utils import nfnet_params
 
 
-def NFNet(n_classes=10, variant='F0', se_ratio=0.5, alpha=0.2, stochdepth_rate=0.1, activation='gelu',
+def gelu(x):
+    cdf = 0.5 * (1.0 + tf.erf(x / tf.sqrt(2.0)))
+    return x*cdf
+
+
+def NFNet(n_classes=10, variant='F0', se_ratio=0.5, alpha=0.2, stochdepth_rate=0.1, activation=gelu,
           final_conv_mult=2, training=True):
     # configurations
     block_params = nfnet_params[variant]
     width_pattern = block_params['width']
     depth_pattern = block_params['depth']
     imsize = block_params['train_imsize'] if training else block_params['test_imsize']
-    activation = nonlinearities[activation]
-    big_pattern = block_params.get('big_width', [True]*4)
     bneck_pattern = block_params.get('expansion', [0.5] * 4)
     group_pattern = block_params.get('group_width', [128] * 4)
     drop_rate = block_params['drop_rate']
@@ -21,9 +25,12 @@ def NFNet(n_classes=10, variant='F0', se_ratio=0.5, alpha=0.2, stochdepth_rate=0
 
     # stem
     inpt = Input((imsize, imsize, 3))
-    x = WSConv2D(16, 3, strides=2, padding='same', activation=activation)(inpt)
-    x = WSConv2D(32, 3, strides=1, padding='same', activation=activation)(x)
-    x = WSConv2D(64, 3, strides=1, padding='same', activation=activation)(x)
+    x = WSConv2D(16, 3, strides=2, padding='same')(inpt)
+    x = Activation(activation)(x)
+    x = WSConv2D(32, 3, strides=1, padding='same')(x)
+    x = Activation(activation)(x)
+    x = WSConv2D(64, 3, strides=1, padding='same')(x)
+    x = Activation(activation)(x)
     x = WSConv2D(width_pattern[0]//2, 3, strides=2, padding='same', groups=1)(x)
 
     # blocks
@@ -44,7 +51,8 @@ def NFNet(n_classes=10, variant='F0', se_ratio=0.5, alpha=0.2, stochdepth_rate=0
             expected_std = (expected_std ** 2 + alpha ** 2) ** 0.5
 
     # final conv
-    x = WSConv2D(width_pattern[-1]*final_conv_mult, 1, strides=1, padding='same', activation=activation)(x)
+    x = WSConv2D(width_pattern[-1]*final_conv_mult, 1, strides=1, padding='same')(x)
+    x = Activation(activation)(x)
 
     # head
     x = GlobalAveragePooling2D()(x)
@@ -63,11 +71,14 @@ def NFBlock(inpt, filters, strides, activation, bneck_ratio, group_width,
     groups = n_filters//group_width
 
     # beta downscale
-    inpt1 = activation(Lambda(lambda x: x*beta)(inpt))
+    inpt1 = Activation(activation)(Lambda(lambda x: x*beta)(inpt))
     # bottleneck: 1x1 + 3x3gc + 3x3gc + 1x1
-    x = WSConv2D(n_filters, 1, strides=1, padding='same', activation=activation)(inpt1)
-    x = WSConv2D(n_filters, 3, strides=strides, groups=groups, padding='same', activation=activation)(x)
-    x = WSConv2D(n_filters, 3, strides=1, groups=groups, padding='same', activation=activation)(x)
+    x = WSConv2D(n_filters, 1, strides=1, padding='same')(inpt1)
+    x = Activation(activation)(x)
+    x = WSConv2D(n_filters, 3, strides=strides, groups=groups, padding='same')(x)
+    x = Activation(activation)(x)
+    x = WSConv2D(n_filters, 3, strides=1, groups=groups, padding='same')(x)
+    x = Activation(activation)(x)
     x = WSConv2D(filters, 1, strides=1, padding='same')(x)
     # se-block
     x = SEBlock(x, se_ratio)
@@ -120,6 +131,7 @@ if __name__ == '__main__':
 
     model = NFNet(n_classes=10, variant='F0')
     model.summary()
+    model.save_weights("nfnet_f0.h5")
 
 
 

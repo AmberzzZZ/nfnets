@@ -1,5 +1,5 @@
 import tensorflow as tf
-from groupConv import GroupConv2DKT
+from GroupConv import GroupConv2DKT, GroupConv2D
 from keras.models import Model
 
 
@@ -29,7 +29,7 @@ class WSConv2D(GroupConv2DKT):
             # group conv
             return super().call(input)
 
-    def standardize_weight(self, weight, eps=1e-4):
+    def standardize_weight(self, weight, eps=1.):
         # weight: (k,k,in,out)
         mean = tf.math.reduce_mean(weight, axis=(0, 1, 2), keepdims=True)   # [N,k]
         var = tf.math.reduce_variance(weight, axis=(0, 1, 2), keepdims=True)  # [N,k]

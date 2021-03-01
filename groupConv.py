@@ -65,7 +65,7 @@ class GroupConv2DKT(Conv2D):
         if self.use_bias:
             x = tf.nn.bias_add(x, self.bias, data_format=self.dim_pattern[self.data_format])
         if self.activation:
-            return self.activation(x)
+            return self.activation(x)    # if activation in keras.activations
         return x
 
     def compute_output_shape(self, input_shape):
@@ -83,6 +83,9 @@ class GroupConv2D(Conv2D):
                                           *args, **kwargs)
         self.groups = groups
         self.channel_axis = -1
+        self.strides = (1,) + self.strides + (1,)
+        self.padding_pattern = {'same': 'SAME', 'valid': 'VALID'}
+        self.dim_pattern = {'channels_last': 'NHWC', 'channels_first': 'NCHW'}
 
     def build(self, input_shape):
         input_dim = input_shape[self.channel_axis]
@@ -114,15 +117,15 @@ class GroupConv2D(Conv2D):
         # split
         groups_inputs = tf.split(inputs, self.groups, axis=self.channel_axis)
         # tf.nn.conv2d
-        groups_outputs = [K.conv2d(inp, self.kernel[i,...],
-                                  strides=self.strides, padding=self.padding,
-                                  dilation_rate=self.dilation_rate, data_format=self.data_format)
-                                  for i, inp in enumerate(groups_inputs)]
+        groups_outputs = [tf.nn.conv2d(inp, self.kernel[i,...], strides=self.strides,
+                                       padding=self.padding_pattern[self.padding],
+                                       data_format=self.dim_pattern[self.data_format])
+                                       for i, inp in enumerate(groups_inputs)]
         # concat
         outputs = tf.concat(groups_outputs, axis=self.channel_axis)
 
         if self.use_bias:
-            outputs = K.bias_add(outputs, self.bias, data_format=self.data_format)
+            outputs = tf.nn.bias_add(outputs, self.bias, data_format=self.dim_pattern[self.data_format])
 
         if self.activation is not None:
             return self.activation(outputs)
@@ -130,8 +133,8 @@ class GroupConv2D(Conv2D):
 
     def compute_output_shape(self, input_shape):
         # [b,h,w,cout]
-        output_h = int(input_shape[1] / self.strides[0])
-        output_w = int(input_shape[2] / self.strides[1])
+        output_h = int(input_shape[1] / self.strides[1])
+        output_w = int(input_shape[2] / self.strides[2])
         return input_shape[0], output_h, output_w, self.filters
 
 
