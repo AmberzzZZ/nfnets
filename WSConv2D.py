@@ -11,6 +11,7 @@ class WSConv2D(GroupConv2DKT):
                                        groups=groups,
                                        kernel_initializer="he_normal",
                                        *args, **kwargs)
+        self.bias = True    # Always add bias
 
     def call(self, input):
         # standardize kernel
@@ -29,8 +30,9 @@ class WSConv2D(GroupConv2DKT):
             # group conv
             return super().call(input)
 
-    def standardize_weight(self, weight, eps=1.):
+    def standardize_weight(self, weight, eps=1e-4):
         # weight: (k,k,in,out)
+        weight_shape = weight.shape
         mean = tf.math.reduce_mean(weight, axis=(0, 1, 2), keepdims=True)   # [N,k]
         var = tf.math.reduce_variance(weight, axis=(0, 1, 2), keepdims=True)  # [N,k]
         fan_in = tf.reduce_prod(weight, axis=(0, 1, 2))   # N
@@ -38,8 +40,14 @@ class WSConv2D(GroupConv2DKT):
                                shape=(weight.shape[-1],),
                                initializer="ones",
                                trainable=True)
-        scale = tf.math.rsqrt(tf.math.maximum(var*fan_in, tf.constant(eps, dtype=tf.float32))) * gain
-        return weight * scale - (mean * scale)
+        weight = tf.reshape(weight, (-1, weight_shape[-1]))   # [N,k]
+        # zeros-centered
+        weight = weight - mean
+        # normalize
+        weight = weight * tf.math.rsqrt(tf.math.maximum(var*fan_in, eps))
+        # affine gain
+        weight = weight * gain
+        return weight
 
 
 if __name__ == '__main__':

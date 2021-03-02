@@ -16,7 +16,7 @@ official repo: https://github.com/deepmind/deepmind-research/tree/master/nfnets
     * nonlinearities: magic constants
     * conv: WSConv2D, scaled weight standardization
         ** 先对weight进行标准化 (W-mean)/sqrt(N*var)
-        ** 再进行rescale（gain）, operate on channel-dim
+        ** 再进行affine: gain & bias
         ** WSConv2D要支持groupConv, 发现自定义Layer中assign方法不可导, 换成等号可导
         ** 参数量: 
             - kernel: k*k*c_in*c_out/groups
@@ -55,6 +55,12 @@ official repo: https://github.com/deepmind/deepmind-research/tree/master/nfnets
 
 
 ## custom SGD_AGC optimizer
+
+
+
+## questions
+    1. 不快？？
+    2. NaN caused by weight norm
 
 
 
