@@ -35,8 +35,8 @@ class WSConv2D(GroupConv2DKT):
         weight_shape = weight.shape
         mean = tf.math.reduce_mean(weight, axis=(0, 1, 2), keepdims=True)   # [N,k]
         var = tf.math.reduce_variance(weight, axis=(0, 1, 2), keepdims=True)  # [N,k]
-        fan_in = tf.reduce_prod(weight, axis=(0, 1, 2))   # N
-        gain = self.add_weight(name='gain',
+        fan_in = tf.cast(tf.reduce_prod(weight_shape[:-1]), tf.float32)   # N
+        gain = self.add_weight(name='gain',                               # k
                                shape=(weight.shape[-1],),
                                initializer="ones",
                                trainable=True)
