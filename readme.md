@@ -22,6 +22,7 @@ official repo: https://github.com/deepmind/deepmind-research/tree/master/nfnets
             - kernel: k*k*c_in*c_out/groups
             - bias: c_out
             - learnable gain: c_out
+        ** 多卡训练时，自定义层的所有trainable params必须在build里面声明（构建图，before replica），否则会在复制模型以后分别为每个replica model创建这个param的内存空间
 
 
 ## stem
@@ -55,12 +56,31 @@ official repo: https://github.com/deepmind/deepmind-research/tree/master/nfnets
 
 
 ## custom SGD_AGC optimizer
+    params: Nesterov=True, momentum=0.9, clipnorm=0.01
+    lr: increase from 0 to 1.6 over 5 epochs, then decay to zero with cosine annealing 
+    Callback的epoch参数：default start from model.fit的initial_epoch，所以各种epoch+1
 
+    for each level & for each unit: 
+        实质上就是每个参数分别做clipnorm，不需要layergroup
+        max_norm是for each level的
+        norm是for each unit的
+
+    基于keras.opv1的SGD改写，在用g更新p之前先执行clipnorm就可以了
+    发现K.cond比tf.where好用，传函数比起传tensor，能够自动broadcast
+
+
+## latency
+    论文里面给的数据，GPU Train(ms):
+    r50:       35.3 
+    eff-b0:    44.8 
+    SE-50:     59.4 
+    nf-f0:     56.7 
+    nf-f1:    133.9 
+    eff-b4:   221.6
 
 
 ## questions
     1. 不快？？
-    2. NaN caused by weight norm
 
 
 

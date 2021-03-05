@@ -13,9 +13,17 @@ class WSConv2D(GroupConv2DKT):
                                        *args, **kwargs)
         self.bias = True    # Always add bias
 
+    def build(self, input_shape):
+        group_out = self.filters // self.groups
+        self.gain = self.add_weight(name='gain',                               # k
+                                    shape=(group_out,),
+                                    initializer="ones",
+                                    trainable=True)
+        super().build(input_shape)
+
     def call(self, input):
         # standardize kernel
-        self.kernel = self.standardize_weight(self.kernel)
+        self.kernel = self.standardize_weight(self.kernel, self.gain)
         # run conv
         if self.groups==1:
             # normal conv
@@ -30,20 +38,16 @@ class WSConv2D(GroupConv2DKT):
             # group conv
             return super().call(input)
 
-    def standardize_weight(self, weight, eps=1e-4):
+    def standardize_weight(self, weight, gain, eps=1e-4):
         # weight: (k,k,in,out)
         weight_shape = weight.shape
-        mean = tf.math.reduce_mean(weight, axis=(0, 1, 2), keepdims=True)   # [N,k]
-        var = tf.math.reduce_variance(weight, axis=(0, 1, 2), keepdims=True)  # [N,k]
+        mean = tf.math.reduce_mean(weight, axis=(0, 1, 2), keepdims=True)   # [k,]
+        var = tf.math.reduce_variance(weight, axis=(0, 1, 2), keepdims=True)  # [k,]
         fan_in = tf.cast(tf.reduce_prod(weight_shape[:-1]), tf.float32)   # N
-        gain = self.add_weight(name='gain',                               # k
-                               shape=(weight.shape[-1],),
-                               initializer="ones",
-                               trainable=True)
-        weight = tf.reshape(weight, (-1, weight_shape[-1]))   # [N,k]
+
         # zeros-centered
         weight = weight - mean
-        # normalize
+        # normalize std=1
         weight = weight * tf.math.rsqrt(tf.math.maximum(var*fan_in, eps))
         # affine gain
         weight = weight * gain
